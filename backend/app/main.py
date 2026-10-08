@@ -5,12 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.prediction import router as prediction_router
 
 
-app = FastAPI()
+app = FastAPI(
+    title="AutoValue AI API",
+    description="AI-powered used car price prediction API",
+    version="1.0.0"
+)
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173",
+                "https://YOUR-FRONTEND.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -4,3 +4,4 @@ import joblib
 MODEL_PATH = "models/used_car_linear_regression.pkl"
 
 model = joblib.load(MODEL_PATH)
+
