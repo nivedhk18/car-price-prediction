@@ -9,25 +9,24 @@ export default function App() {
   const [activeSection, setActiveSection] = useState('home');
 
   // Form state
-  const [formData, setFormData] = useState({
-    brand: 'Toyota',
-    model: 'Fortuner',
-    mfgYear: '2019',
-    fuelType: 'Diesel',
-    transmission: 'Automatic',
-    engineCapacity: '2755 cc',
-    kmDriven: '45000',
-    ownership: '1st Owner',
-    spareKey: 'Yes'
-  });
+const [formData, setFormData] = useState({
+  brand: '',
+  model: '',
+  mfgYear: '',
+  fuelType: '',
+  transmission: '',
+  engineCapacity: '',
+  kmDriven: '',
+  ownership: '',
+  spareKey: ''
+});
 
   // Calculation state and results
   const [isCalculating, setIsCalculating] = useState(false);
+  const [error, setError] = useState('');
+  const [submittedCar, setSubmittedCar] = useState(null);
   const [result, setResult] = useState({
-    price: '₹8,45,000',
-    confidence: '94%',
-    marketDemand: 'High',
-    valuationRange: '₹8,20,000 - ₹8,70,000'
+  price: '—'
   });
 
   // Available models grouped by car brand
@@ -57,84 +56,94 @@ export default function App() {
 
   // Handle form input changes
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => {
-      const updated = { ...prev, [name]: value };
-      if (name === 'brand' && carModels[value]) {
-        updated.model = carModels[value][0];
-      }
-      return updated;
-    });
-  };
+  const { name, value } = e.target;
+
+  setFormData((prev) => {
+    const updated = {
+      ...prev,
+      [name]: value
+    };
+
+    // When brand changes, clear the model
+    if (name === 'brand') {
+      updated.model = '';
+    }
+
+    return updated;
+  });
+};
 
   // Handle price estimation calculation
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsCalculating(true);
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    setTimeout(() => {
-      let basePrice = 1200000;
-      const brandBase = {
-        Toyota: 1800000,
-        Hyundai: 950000,
-        Honda: 850000,
-        'Maruti Suzuki': 600000,
-        Mahindra: 1250000,
-        Tata: 900000,
-        BMW: 3200000,
-        'Mercedes-Benz': 3500000,
-        Audi: 3100000,
-        Volkswagen: 900000,
-        Ford: 1100000,
-        Kia: 1050000
-      };
+  setIsCalculating(true);
+  setError('');
 
-      if (brandBase[formData.brand]) {
-        basePrice = brandBase[formData.brand];
+  try {
+    const response = await fetch(
+      'http://127.0.0.1:8000/api/v1/predict',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...formData,
+          mfgYear: parseInt(formData.mfgYear),
+          engineCapacity: parseFloat(formData.engineCapacity),
+          kmDriven: parseInt(formData.kmDriven)
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 422) {
+        const validationMessage =
+          data.detail?.[0]?.msg || 'Invalid input data.';
+
+        throw new Error(validationMessage);
       }
 
-      if (formData.model === 'Fortuner' || formData.model === 'Endeavour' || formData.model === 'XUV700') {
-        basePrice *= 1.45;
-      } else if (formData.model === 'Creta' || formData.model === 'Seltos' || formData.model === 'Thar') {
-        basePrice *= 1.25;
-      }
+      throw new Error(
+        data.detail || 'Unable to generate prediction.'
+      );
+    }
 
-      const currentYear = 2026;
-      const mfgYr = parseInt(formData.mfgYear) || 2019;
-      const age = Math.max(0, currentYear - mfgYr);
-      let depRate = Math.min(0.70, age * 0.085);
-      
-      const kms = parseInt(formData.kmDriven) || 45000;
-      const kmDep = Math.min(0.20, (kms / 100000) * 0.15);
-      
-      const transMult = formData.transmission === 'Automatic' ? 1.08 : 1.0;
-      const ownerMult = formData.ownership === '1st Owner' ? 1.0 : (formData.ownership === '2nd Owner' ? 0.92 : 0.84);
-      const keyMult = formData.spareKey === 'Yes' ? 1.02 : 0.98;
+    const predictedPrice = Math.round(data.predictedPrice);
 
-      let finalPrice = basePrice * (1 - depRate - kmDep) * transMult * ownerMult * keyMult;
-      if (finalPrice < 150000) finalPrice = 185000;
+    const formattedPrice =
+      '₹' + predictedPrice.toLocaleString('en-IN');
 
-      const formattedPrice = '₹' + Math.round(finalPrice).toLocaleString('en-IN');
-      const minRange = '₹' + Math.round(finalPrice * 0.96).toLocaleString('en-IN');
-      const maxRange = '₹' + Math.round(finalPrice * 1.04).toLocaleString('en-IN');
-      const confidenceVal = Math.min(97, Math.max(91, 95 - (age > 8 ? 2 : 0) + (formData.spareKey === 'Yes' ? 1 : 0)));
+    setResult({
+      price: formattedPrice
+    });
 
-      setResult({
-        price: formattedPrice,
-        confidence: `${confidenceVal}%`,
-        marketDemand: age <= 5 ? 'High' : 'Moderate',
-        valuationRange: `${minRange} - ${maxRange}`
-      });
+    setSubmittedCar({ ...formData });
 
+    setFormData({
+      brand: '',
+      model: '',
+      mfgYear: '',
+      fuelType: '',
+      transmission: '',
+      engineCapacity: '',
+      kmDriven: '',
+      ownership: '',
+      spareKey: ''
+    });
+
+    } catch (error) {
+      console.error('Prediction error:', error);
+
+      setError(error.message);
+
+    } finally {
       setIsCalculating(false);
-
-      const resultCard = document.getElementById('result-card');
-      if (resultCard) {
-        resultCard.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 600);
+    }
   };
-
   return (
     <div className="app-container">
       {/* 1. Navbar */}
@@ -165,12 +174,17 @@ export default function App() {
           onSubmit={handleSubmit}
           isCalculating={isCalculating}
         />
+        {error && (
+          <div className="error-message">
+            ⚠️ {error}
+          </div>
+        )}
 
-        <ResultCard 
-          result={result}
-          formData={formData}
-          isCalculating={isCalculating}
-        />
+      <ResultCard
+        result={result}
+        formData={submittedCar}
+        isCalculating={isCalculating}
+      />
       </section>
 
       {/* Footer */}

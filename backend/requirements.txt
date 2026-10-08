@@ -4,3 +4,12 @@ scikit-learn
 joblib
 pandas
 pydantic
+
+
+
+# setResult({
+#   price: formattedPrice,
+#   confidence: '—',
+#   marketDemand: '—',
+#   valuationRange: '—'
+# });  we should remove these from frnt end
